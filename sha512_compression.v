@@ -1,8 +1,8 @@
 `timescale 1ns / 1ps
 
 module sha512_compression(
-    input [0:63] ki,
     input [0:63] wi,
+    input [0:63] ki,
 
     input [0:63] ai,
     input [0:63] bi,
@@ -30,7 +30,7 @@ module sha512_compression(
     reg [0:63] tmp1;
     reg [0:63] tmp2;
 
-    always @(ki, wi, ai, bi, ci, di, ei, fi, gi, hi) begin
+    always @(*) begin
         S0 = ((ai >> 28) | (ai << (64-28)))
             ^((ai >> 34) | (ai << (64-34)))
             ^((ai >> 39) | (ai << (64-39)));
