@@ -25,7 +25,7 @@ module sha512_chunk(
     output oH6,
     output oH7
 );
-    localparam [0:63] K_const[0:79] = {
+    localparam [63:0] K_const[0:79] = {
         64'h428a2f98d728ae22,
         64'h7137449123ef65cd,
         64'hb5c0fbcfec4d3b2f,
@@ -113,8 +113,8 @@ module sha512_chunk(
     reg loop_ip;
     reg [0:7] nloop;
 
-    reg [0:63] w[0:79];
-    wire [0:63] gen_w[0:79];
+    reg [63:0] w[0:79];
+    wire [63:0] gen_w[0:79];
 
     // make the new w's
     sha512_gen_w sha512_gen_w_0(w[0:15], gen_w[16:31]);
@@ -122,32 +122,32 @@ module sha512_chunk(
     sha512_gen_w sha512_gen_w_2(w[32:47], gen_w[48:63]);
     sha512_gen_w sha512_gen_w_3(w[48:63], gen_w[64:79]);
 
-    reg [0:63] feed_w;
-    reg [0:63] feed_K;
-    reg [0:63] ai;
-    reg [0:63] bi;
-    reg [0:63] ci;
-    reg [0:63] di;
-    reg [0:63] ei;
-    reg [0:63] fi;
-    reg [0:63] gi;
-    reg [0:63] hi;
-    reg [0:63] a;
-    reg [0:63] b;
-    reg [0:63] c;
-    reg [0:63] d;
-    reg [0:63] e;
-    reg [0:63] f;
-    reg [0:63] g;
-    reg [0:63] h;
-    wire [0:63] oa;
-    wire [0:63] ob;
-    wire [0:63] oc;
-    wire [0:63] od;
-    wire [0:63] oe;
-    wire [0:63] of;
-    wire [0:63] og;
-    wire [0:63] oh;
+    reg [63:0] feed_w;
+    reg [63:0] feed_K;
+    reg [63:0] ai;
+    reg [63:0] bi;
+    reg [63:0] ci;
+    reg [63:0] di;
+    reg [63:0] ei;
+    reg [63:0] fi;
+    reg [63:0] gi;
+    reg [63:0] hi;
+    reg [63:0] a;
+    reg [63:0] b;
+    reg [63:0] c;
+    reg [63:0] d;
+    reg [63:0] e;
+    reg [63:0] f;
+    reg [63:0] g;
+    reg [63:0] h;
+    wire [63:0] oa;
+    wire [63:0] ob;
+    wire [63:0] oc;
+    wire [63:0] od;
+    wire [63:0] oe;
+    wire [63:0] of;
+    wire [63:0] og;
+    wire [63:0] oh;
     sha512_compression sha512_compression_0(
         feed_w,
         feed_K,

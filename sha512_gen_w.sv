@@ -1,8 +1,8 @@
 `timescale 1ns / 1ps
 
 module sha512_gen_w(
-    input [0:63] w[0:15],
-    output [0:63] out[16:31]
+    input [63:0] w[0:15],
+    output [63:0] out[16:31]
 );
     integer i;
     for (i = 16; i < 32; i++) {

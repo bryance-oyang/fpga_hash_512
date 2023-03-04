@@ -1,34 +1,34 @@
 `timescale 1ns / 1ps
 
 module sha512_compression(
-    input [0:63] wi,
-    input [0:63] ki,
+    input [63:0] wi,
+    input [63:0] ki,
 
-    input [0:63] ai,
-    input [0:63] bi,
-    input [0:63] ci,
-    input [0:63] di,
-    input [0:63] ei,
-    input [0:63] fi,
-    input [0:63] gi,
-    input [0:63] hi,
+    input [63:0] ai,
+    input [63:0] bi,
+    input [63:0] ci,
+    input [63:0] di,
+    input [63:0] ei,
+    input [63:0] fi,
+    input [63:0] gi,
+    input [63:0] hi,
 
-    output reg [0:63] ao,
-    output reg [0:63] bo,
-    output reg [0:63] co,
-    output reg [0:63] do,
-    output reg [0:63] eo,
-    output reg [0:63] fo,
-    output reg [0:63] go,
-    output reg [0:63] ho
+    output reg [63:0] oa,
+    output reg [63:0] ob,
+    output reg [63:0] oc,
+    output reg [63:0] od,
+    output reg [63:0] oe,
+    output reg [63:0] of,
+    output reg [63:0] og,
+    output reg [63:0] oh
     );
 
-    reg [0:63] S0;
-    reg [0:63] S1;
-    reg [0:63] ch;
-    reg [0:63] maj;
-    reg [0:63] tmp1;
-    reg [0:63] tmp2;
+    reg [63:0] S0;
+    reg [63:0] S1;
+    reg [63:0] ch;
+    reg [63:0] maj;
+    reg [63:0] tmp1;
+    reg [63:0] tmp2;
 
     always @(*) begin
         S0 = ((ai >> 28) | (ai << (64-28)))
@@ -42,13 +42,13 @@ module sha512_compression(
         maj = (ai & bi) ^ (ai & ci) ^ (bi & ci);
         tmp2 = S0 + maj;
 
-        ho = gi;
-        go = fi;
-        fo = ei;
-        eo = di + tmp1;
-        do = ci;
-        co = bi;
-        bo = ai;
-        ao = tmp1 + tmp2;
+        oh = gi;
+        og = fi;
+        of = ei;
+        oe = di + tmp1;
+        od = ci;
+        oc = bi;
+        ob = ai;
+        oa = tmp1 + tmp2;
     end
 endmodule
