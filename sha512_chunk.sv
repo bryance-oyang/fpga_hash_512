@@ -278,5 +278,4 @@ module sha512_chunk(
         end
         endcase
     end
-
 endmodule
