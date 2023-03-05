@@ -94,23 +94,23 @@ module sha512_chunk(
 
     input [1023:0] chunk, // 128 bytes
 
-    input H0i,
-    input H1i,
-    input H2i,
-    input H3i,
-    input H4i,
-    input H5i,
-    input H6i,
-    input H7i,
+    input [63:0] H0i,
+    input [63:0] H1i,
+    input [63:0] H2i,
+    input [63:0] H3i,
+    input [63:0] H4i,
+    input [63:0] H5i,
+    input [63:0] H6i,
+    input [63:0] H7i,
 
-    output oH0,
-    output oH1,
-    output oH2,
-    output oH3,
-    output oH4,
-    output oH5,
-    output oH6,
-    output oH7
+    output [63:0] oH0,
+    output [63:0] oH1,
+    output [63:0] oH2,
+    output [63:0] oH3,
+    output [63:0] oH4,
+    output [63:0] oH5,
+    output [63:0] oH6,
+    output [63:0] oH7
 );
     localparam [63:0] K_const[0:79] = {
         64'h428a2f98d728ae22,
@@ -194,7 +194,7 @@ module sha512_chunk(
         64'h5fcb6fab3ad6faec,
         64'h6c44198c4a475817
     };
-    
+
     integer j;
 
     reg [63:0] ai;
