@@ -1,90 +1,9 @@
 `timescale 1ns / 1ps
+
 /*
-	uint64_t w[80];
-
-    // INIT
-	for (int i = 0; i < 16; i++) {
-		w[i] = 0;
-		// 8 bytes per 64-bit word
-		for (int j = 0; j < 8; j++) {
-			uint64_t tmp = chunk[8*i + j];
-			w[i] |= tmp << 8*(7-j);
-		}
-	}
-
-    // W_00
-    // W_16 - W_64
-	uint64_t s0;
-	uint64_t s1;
-	for (int i = 16; i < 80; i++) {
-		s0 =
-			  ((w[i-15] >> 1) | (w[i-15] << (64-1)))
-			^ ((w[i-15] >> 8) | (w[i-15] << (64-8)))
-			^ ((w[i-15] >> 7));
-
-		s1 =
-			  ((w[i-2] >> 19) | (w[i-2] << (64-19)))
-			^ ((w[i-2] >> 61) | (w[i-2] << (64-61)))
-			^ ((w[i-2] >> 6));
-
-		w[i] = w[i-16] + s0 + w[i-7] + s1;
-	}
-
-	uint64_t ai = iH[0];
-	uint64_t a[1] = iH[1];
-	uint64_t a[2] = iH[2];
-	uint64_t a[3] = iH[3];
-	uint64_t a[4] = iH[4];
-	uint64_t a[5] = iH[5];
-	uint64_t a[6] = iH[6];
-	uint64_t a[7] = iH[7];
-
-    // RUN_COMPRESS
-	uint64_t oa, ob, oc, od, oe, of, og, oh;
-	for (int i = 0; i < 80; i++) {
-		sha512_compression(
-			w[i],
-			K_const[i],
-
-			ai,
-			a[1],
-			a[2],
-			a[3],
-			a[4],
-			a[5],
-			a[6],
-			a[7],
-
-			&oa,
-			&ob,
-			&oc,
-			&od,
-			&oe,
-			&of,
-			&og,
-			&oh
-		);
-
-        // OUT_COMPRESS
-		ai = oa;
-		a[1] = ob;
-		a[2] = oc;
-		a[3] = od;
-		a[4] = oe;
-		a[5] = of;
-		a[6] = og;
-		a[7] = oh;
-	}
-
-	// can be combinational, just need a done flag for loops
-	*oH[0] = iH[0] + ai;
-	*oH[1] = iH[1] + a[1];
-	*oH[2] = iH[2] + a[2];
-	*oH[3] = iH[3] + a[3];
-	*oH[4] = iH[4] + a[4];
-	*oH[5] = iH[5] + a[5];
-	*oH[6] = iH[6] + a[6];
-	*oH[7] = iH[7] + a[7];
+The w generation and compression rounds are combined into the same loop.
+w[0] is always the input to the compression, and newly generated w's are
+shifted left during the looping.
 */
 
 module sha512_chunk(
@@ -93,8 +12,8 @@ module sha512_chunk(
     output done,
 
     input [1023:0] chunk, // 128 bytes
-    input [0:7][63:0] iH,
-    output [0:7][63:0] oH
+    input [0:7][63:0] iH, // 64 bytes == 512 bits input hash
+    output [0:7][63:0] oH // 64 bytes == 512 bits output hash
 );
     localparam [63:0] K_const[0:79] = {
         64'h428a2f98d728ae22,
@@ -180,7 +99,7 @@ module sha512_chunk(
     };
 
     reg [0:16][63:0] w; // 16th is for scratch space to hold next w calculation
-    reg [0:7][63:0] a;
+    reg [0:7][63:0] a; // a,b,c,d,e,f,g,h
     reg [63:0] tmp1;
     reg [63:0] tmp2;
 
@@ -266,14 +185,14 @@ module sha512_chunk(
                 ^ ((w[14] >> 61) | (w[14] << (64-61)))
                 ^ ((w[14] >> 6)));
 
-            a <= (a >> 64);
+            a <= (a >> 64); // b = a, c = b, etc
         end
 
         COMPRESS: begin
             a[0] <= tmp1 + tmp2;
             a[4] <= a[4] + tmp1;
 
-            w <= (w << 64);
+            w <= (w << 64); // make next input w the w[0]
             i <= i + 1;
         end
         endcase

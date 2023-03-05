@@ -1,25 +1,26 @@
 `timescale 1ns / 1ps
 
-`define CIDX(ind, bsize) (bsize - 8*(ind + 1))
-
 /*
 index conversion
 char c_array[M];
 reg [N:0] v_array;
 c_array[x] <-> v_array[N + 1 - 8*(x + 1) +: 8]
+*/
+`define CIDX(ind, bsize) (bsize - 8*(ind + 1))
 
+/*
 // IPAD_0
 chunk = ipad ^ key;
 iH = init;
 
-// IPAD_1
+// IPAD_R
 sha512(chunk);
 
 // MSG_0
 chunk = msg and pad;
 iH = oH;
 
-// MSG_1
+// MSG_R
 sha512(chunk);
 
 // OPAD_0
@@ -27,14 +28,14 @@ shasum = oH;
 chunk = opad ^ key;
 iH = init;
 
-// OPAD_1
+// OPAD_R
 sha512(chunk);
 
 // SUM_0
 chunk = shasum and pad;
 iH = oH;
 
-// SUM_1
+// SUM_R
 sha512(chunk);
 */
 
@@ -43,7 +44,7 @@ module hmac(
     input reset,
     output done,
 
-    input mode, // mode == 0 means 36B/288b msg; mode == 1 means 64B/512b msg
+    input mode, // mode == 0 means 36B/288b msg; mode == 1 means 64B/512b msg (32 byte salt + 4 byte int in PBKDF2 or prior hash)
     input [1023:0] key, // NEEDS to be zero padded
     input [511:0] msg, // does NOT need to be zero padded
     output [511:0] oH
@@ -77,16 +78,21 @@ module hmac(
     reg [3:0] state;
     reg [3:0] next;
 
-    localparam BIRTH =  0;
-    localparam IPAD_0 = 1;
-    localparam IPAD_1 = 2;
-    localparam MSG_0 =  3;
-    localparam MSG_1 =  4;
-    localparam OPAD_0 = 5;
-    localparam OPAD_1 = 6;
-    localparam SUM_0 =  7;
-    localparam SUM_1 =  8;
-    localparam DEATH =  9;
+    localparam BIRTH =   0;
+
+    localparam IPAD_0 =  1;
+    localparam IPAD_R =  2;
+
+    localparam MSG_0 =   3;
+    localparam MSG_R =   4;
+
+    localparam OPAD_0 =  5;
+    localparam OPAD_R =  6;
+
+    localparam SUM_0 =   7;
+    localparam SUM_R =   8;
+
+    localparam DEATH =   9;
 
     always @(posedge clk or negedge reset) begin
         if (!reset)
@@ -105,32 +111,36 @@ module hmac(
 
         BIRTH:
             next = IPAD_0;
+
         IPAD_0:
-            next = IPAD_1;
-        IPAD_1:
+            next = IPAD_R;
+        IPAD_R:
             if (!sha512_done)
-                next = IPAD_1;
+                next = IPAD_R;
             else
                 next = MSG_0;
+
         MSG_0:
-            next = MSG_1;
-        MSG_1:
+            next = MSG_R;
+        MSG_R:
             if (!sha512_done)
-                next = MSG_1;
+                next = MSG_R;
             else
                 next = OPAD_0;
+
         OPAD_0:
-            next = OPAD_1;
-        OPAD_1:
+            next = OPAD_R;
+        OPAD_R:
             if (!sha512_done)
-                next = OPAD_1;
+                next = OPAD_R;
             else
                 next = SUM_0;
+
         SUM_0:
-            next = SUM_1;
-        SUM_1:
+            next = SUM_R;
+        SUM_R:
             if (!sha512_done)
-                next = SUM_1;
+                next = SUM_R;
             else
                 next = DEATH;
         endcase
@@ -144,12 +154,13 @@ module hmac(
             sha512_reset <= 0;
             iH <= H_const;
 
+            // i_pad
             for (integer i = 0; i < 128; i++) begin
                 chunk[`CIDX(i,1024) +: 8] <= 8'h36 ^ key[`CIDX(i,1024) +: 8];
             end
         end
 
-        IPAD_1:
+        IPAD_R:
             sha512_reset <= 1;
 
         MSG_0: begin
@@ -160,28 +171,28 @@ module hmac(
                 // 36 bytes == 288 bits
                 chunk[736 +: 288] <= msg[224 +: 288];
 
-                // padding
-                chunk[`CIDX(36,1024) +: 8] = 8'h80;
+                // sha512 padding: 1 and msg len in bits
+                chunk[`CIDX(36,1024) +: 8] <= 8'h80;
                 for (integer i = 37; i < 126; i++) begin
-                    chunk[`CIDX(i,1024) +: 8] = 0;
+                    chunk[`CIDX(i,1024) +: 8] <= 0;
                 end
-                chunk[`CIDX(126,1024) +: 8] = 8'h05;
-                chunk[`CIDX(127,1024) +: 8] = 8'h20;
+                chunk[`CIDX(126,1024) +: 8] <= 8'h05;
+                chunk[`CIDX(127,1024) +: 8] <= 8'h20;
             end else begin
                 // 64 bytes == 512 bits
                 chunk[1023:512] <= msg[511:0];
 
-                // padding
-                chunk[`CIDX(64,1024) +: 8] = 8'h80;
+                // sha512 padding: 1 and msg len in bits
+                chunk[`CIDX(64,1024) +: 8] <= 8'h80;
                 for (integer i = 65; i < 126; i++) begin
-                    chunk[`CIDX(i,1024) +: 8] = 0;
+                    chunk[`CIDX(i,1024) +: 8] <= 0;
                 end
-                chunk[`CIDX(126,1024) +: 8] = 8'h06;
-                chunk[`CIDX(127,1024) +: 8] = 0;
+                chunk[`CIDX(126,1024) +: 8] <= 8'h06;
+                chunk[`CIDX(127,1024) +: 8] <= 0;
             end
         end
 
-        MSG_1:
+        MSG_R:
             sha512_reset <= 1;
 
         OPAD_0: begin
@@ -189,12 +200,13 @@ module hmac(
             iH <= H_const;
 
             shasum <= oH;
+            // o_pad
             for (integer i = 0; i < 128; i++) begin
                 chunk[`CIDX(i,1024) +: 8] <= 8'h5c ^ key[`CIDX(i,1024) +: 8];
             end
         end
 
-        OPAD_1:
+        OPAD_R:
             sha512_reset <= 1;
 
         SUM_0: begin
@@ -203,16 +215,16 @@ module hmac(
 
             chunk[1023:512] <= shasum[511:0];
 
-            // padding
-            chunk[`CIDX(64,1024) +: 8] = 8'h80;
+            // sha512 padding: 1 and msg len in bits
+            chunk[`CIDX(64,1024) +: 8] <= 8'h80;
             for (integer i = 65; i < 126; i++) begin
-                chunk[`CIDX(i,1024) +: 8] = 0;
+                chunk[`CIDX(i,1024) +: 8] <= 0;
             end
-            chunk[`CIDX(126,1024) +: 8] = 8'h06;
-            chunk[`CIDX(127,1024) +: 8] = 0;
+            chunk[`CIDX(126,1024) +: 8] <= 8'h06;
+            chunk[`CIDX(127,1024) +: 8] <= 0;
         end
 
-        SUM_1:
+        SUM_R:
             sha512_reset <= 1;
         endcase
     end
