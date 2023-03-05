@@ -1,9 +1,98 @@
 `timescale 1ns / 1ps
+/*
+	uint64_t w[80];
+
+    // INIT
+	for (int i = 0; i < 16; i++) {
+		w[i] = 0;
+		// 8 bytes per 64-bit word
+		for (int j = 0; j < 8; j++) {
+			uint64_t tmp = chunk[8*i + j];
+			w[i] |= tmp << 8*(7-j);
+		}
+	}
+
+    // W_00
+    // W_16 - W_64
+	uint64_t s0;
+	uint64_t s1;
+	for (int i = 16; i < 80; i++) {
+		s0 =
+			  ((w[i-15] >> 1) | (w[i-15] << (64-1)))
+			^ ((w[i-15] >> 8) | (w[i-15] << (64-8)))
+			^ ((w[i-15] >> 7));
+
+		s1 =
+			  ((w[i-2] >> 19) | (w[i-2] << (64-19)))
+			^ ((w[i-2] >> 61) | (w[i-2] << (64-61)))
+			^ ((w[i-2] >> 6));
+
+		w[i] = w[i-16] + s0 + w[i-7] + s1;
+	}
+
+	uint64_t ai = H0i;
+	uint64_t bi = H1i;
+	uint64_t ci = H2i;
+	uint64_t di = H3i;
+	uint64_t ei = H4i;
+	uint64_t fi = H5i;
+	uint64_t gi = H6i;
+	uint64_t hi = H7i;
+
+    // RUN_COMPRESS
+	uint64_t oa, ob, oc, od, oe, of, og, oh;
+	for (int i = 0; i < 80; i++) {
+		sha512_compression(
+			w[i],
+			K_const[i],
+
+			ai,
+			bi,
+			ci,
+			di,
+			ei,
+			fi,
+			gi,
+			hi,
+
+			&oa,
+			&ob,
+			&oc,
+			&od,
+			&oe,
+			&of,
+			&og,
+			&oh
+		);
+
+        // OUT_COMPRESS
+		ai = oa;
+		bi = ob;
+		ci = oc;
+		di = od;
+		ei = oe;
+		fi = of;
+		gi = og;
+		hi = oh;
+	}
+
+	// can be combinational, just need a done flag for loops
+	*oH0 = H0i + ai;
+	*oH1 = H1i + bi;
+	*oH2 = H2i + ci;
+	*oH3 = H3i + di;
+	*oH4 = H4i + ei;
+	*oH5 = H5i + fi;
+	*oH6 = H6i + gi;
+	*oH7 = H7i + hi;
+*/
 
 module sha512_chunk(
     input clk,
     input reset,
-    output reg done,
+    output done,
+
+    input [1023:0] chunk, // 128 bytes
 
     input H0i,
     input H1i,
@@ -13,8 +102,6 @@ module sha512_chunk(
     input H5i,
     input H6i,
     input H7i,
-
-    input [0:1024] chunk, // 128 bytes
 
     output oH0,
     output oH1,
@@ -108,22 +195,6 @@ module sha512_chunk(
         64'h6c44198c4a475817
     };
 
-    integer i;
-    reg [0:3] rip;
-    reg loop_ip;
-    reg [0:7] nloop;
-
-    reg [63:0] w[0:79];
-    wire [63:0] gen_w[0:79];
-
-    // make the new w's
-    sha512_gen_w sha512_gen_w_0(w[0:15], gen_w[16:31]);
-    sha512_gen_w sha512_gen_w_1(w[16:31], gen_w[32:47]);
-    sha512_gen_w sha512_gen_w_2(w[32:47], gen_w[48:63]);
-    sha512_gen_w sha512_gen_w_3(w[48:63], gen_w[64:79]);
-
-    reg [63:0] feed_w;
-    reg [63:0] feed_K;
     reg [63:0] ai;
     reg [63:0] bi;
     reg [63:0] ci;
@@ -132,130 +203,166 @@ module sha512_chunk(
     reg [63:0] fi;
     reg [63:0] gi;
     reg [63:0] hi;
-    reg [63:0] a;
-    reg [63:0] b;
-    reg [63:0] c;
-    reg [63:0] d;
-    reg [63:0] e;
-    reg [63:0] f;
-    reg [63:0] g;
-    reg [63:0] h;
-    wire [63:0] oa;
-    wire [63:0] ob;
-    wire [63:0] oc;
-    wire [63:0] od;
-    wire [63:0] oe;
-    wire [63:0] of;
-    wire [63:0] og;
-    wire [63:0] oh;
-    sha512_compression sha512_compression_0(
-        feed_w,
-        feed_K,
+    reg [63:0] S0;
+    reg [63:0] S1;
+    reg [63:0] ch;
+    reg [63:0] maj;
+    reg [63:0] tmp1;
+    reg [63:0] tmp2;
 
-        ai,
-        bi,
-        ci,
-        di,
-        ei,
-        fi,
-        gi,
-        hi,
-
-        oa,
-        ob,
-        oc,
-        od,
-        oe,
-        of,
-        og,
-        oh
-    );
-
-    always @(posedge clk) begin
-        if (reset) begin
-            rip <= 4'd0;
-            done <= 0;
-        end else begin
-            case(rip)
-            default:
-                rip <= 4'd0;
-                done <= 0;
-
-            4'd0:
-                rip <= rip + 1;
-                for (i = 0; i < 16; i++) {
-                    w[i] <= chunk[64*i : 64*(i+1) - 1]
-                }
-            4'd1:
-                rip <= rip + 1;
-                w[16:31] <= gen_w[16:31]
-            4'd2:
-                rip <= rip + 1;
-                w[32:47] <= gen_w[32:47]
-            4'd3:
-                rip <= rip + 1;
-                w[48:63] <= gen_w[48:63]
-            4'd4:
-                rip <= rip + 1;
-                w[64:79] <= gen_w[64:79]
-
-                // setup for loop
-                nloop <= 8'd0;
-                loop_ip <= 0;
-
-                a <= H0i;
-                b <= H1i;
-                c <= H2i;
-                d <= H3i;
-                e <= H4i;
-                f <= H5i;
-                g <= H6i;
-                h <= H7i;
-
-            4'd5:
-                // run 80 sha512 compression loops
-                if (nloop == 8'd80) {
-                    rip <= rip + 1;
-                } else {
-                    loop_ip <= loop_ip + 1;
-                    if (!loop_ip) {
-                        feed_w <= w[nloop];
-                        feed_K <= K_const[nloop];
-                        ai <= a;
-                        bi <= b;
-                        ci <= c;
-                        di <= d;
-                        ei <= e;
-                        fi <= f;
-                        gi <= g;
-                        hi <= h;
-                    } else {
-                        a <= oa;
-                        b <= ob;
-                        c <= oc;
-                        d <= od;
-                        e <= oe;
-                        f <= of;
-                        g <= og;
-                        h <= oh;
-                        nloop <= nloop + 1;
-                    }
-                }
-
-            4'd6:
-                done = 1;
-
-            endcase
-        end
+    // generate w's
+    reg [63:0] w[0:79];
+    reg [63:0] feed_w[0:15];
+    reg [63:0] out_w[0:15];
+    always @(*) begin
+        for (i = 16; i < 32; i++) {
+            out_w[i-16] = feed_w[i-16] + feed_w[i-7]
+                // s0
+                + ((feed_w[i-15] >> 1) | (feed_w[i-15] << (64-1)))
+                ^ ((feed_w[i-15] >> 8) | (feed_w[i-15] << (64-8)))
+                ^ ((feed_w[i-15] >> 7))
+                // s1
+                + ((feed_w[i-2] >> 19) | (feed_w[i-2] << (64-19)))
+                ^ ((feed_w[i-2] >> 61) | (feed_w[i-2] << (64-61)))
+                ^ ((feed_w[i-2] >> 6));
+        }
     end
 
-    // can be combinational, just need a done flag for loops
-    assign oH0 = H0i + a;
-    assign oH1 = H1i + b;
-    assign oH2 = H2i + c;
-    assign oH3 = H3i + d;
-    assign oH4 = H4i + e;
-    assign oH5 = H5i + f;
-    assign oH6 = H6i + g;
-    assign oH7 = H7i + h;
+    // generate output
+    assign oH0 = H0i + ai;
+    assign oH1 = H1i + bi;
+    assign oH2 = H2i + ci;
+    assign oH3 = H3i + di;
+    assign oH4 = H4i + ei;
+    assign oH5 = H5i + fi;
+    assign oH6 = H6i + gi;
+    assign oH7 = H7i + hi;
+
+    reg [3:0] state;
+    reg [3:0] next;
+    reg [6:0] i;
+
+    integer j;
+    localparam BIRTH =        0;
+    localparam W_00 =         1;
+    localparam W_16 =         2;
+    localparam W_32 =         3;
+    localparam W_48 =         4;
+    localparam W_64 =         5;
+    localparam SCHMAJ =       6;
+    localparam TMPS =         7;
+    localparam OUT_COMPRESS = 8;
+    localparam DEATH =        9;
+
+    always @(posedge clk or negedge reset) begin
+        if (!reset)
+            state <= BIRTH;
+        else
+            state <= next;
+    end
+    assign done = (state == DEATH);
+
+    always @(*) begin
+        case(state)
+        default:
+            next = BIRTH;
+        DEATH:
+            next = DEATH
+
+        BIRTH:
+            next = W_00;
+        W_00:
+            next = W_16;
+        W_16:
+            next = W_32;
+        W_32:
+            next = W_48;
+        W_48:
+            next = W_64;
+        W_64:
+            next = SCHMAJ;
+
+        SCHMAJ:
+            next = TMPS;
+        TMPS:
+            next = OUT_COMPRESS;
+        OUT_COMPRESS:
+            if (i < 80)
+                next = SCHMAJ;
+            else
+                next = DEATH;
+        endcase
+    end
+
+    always @(posedge clk) begin
+        case(next)
+        W_00: begin
+            for (j = 0; j < 16; j++) {
+                w[j][63:0] <= chunk[64*(16-j) - 1 : 64*(15-j)];
+                feed_w[j][63:0] <= chunk[64*(16-j) - 1 : 64*(15-j)];
+            }
+        end
+
+        W_16: begin
+            w[16:31] <= out_w[0:15];
+            feed_w[0:15] <= out_w[0:15];
+        end
+
+        W_32: begin
+            w[32:47] <= out_w[0:15];
+            feed_w[0:15] <= out_w[0:15];
+        end
+
+        W_48: begin
+            w[48:63] <= out_w[0:15];
+            feed_w[0:15] <= out_w[0:15];
+        end
+
+        W_64: begin
+            w[64:79] <= out_w[0:15];
+            feed_w[0:15] <= out_w[0:15];
+
+            ai <= H0i;
+            bi <= H1i;
+            ci <= H2i;
+            di <= H3i;
+            ei <= H4i;
+            fi <= H5i;
+            gi <= H6i;
+            hi <= H7i;
+
+            i <= 0;
+        end
+
+        SCHMAJ: begin
+            S0 <= ((ai >> 28) | (ai << (64-28)))
+                ^((ai >> 34) | (ai << (64-34)))
+                ^((ai >> 39) | (ai << (64-39)));
+            S1 <= ((ei >> 14) | (ei << (64-14)))
+                ^((ei >> 18) | (ei << (64-18)))
+                ^((ei >> 41) | (ei << (64-41)));
+            ch <= (ei & fi) ^ ((~ei) & gi);
+            maj <= (ai & bi) ^ (ai & ci) ^ (bi & ci);
+        end
+
+        TMPS: begin
+            tmp1 <= hi + S1 + ch + K[i] + w[i];
+            tmp2 <= S0 + maj;
+        end
+
+        OUT_COMPRESS: begin
+            hi <= gi;
+            gi <= fi;
+            fi <= ei;
+            ei <= di + tmp1;
+            di <= ci;
+            ci <= bi;
+            bi <= ai;
+            ai <= tmp1 + tmp2;
+
+            i <= i + 1;
+        end
+        endcase
+    end
+
 endmodule

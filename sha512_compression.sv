@@ -3,6 +3,7 @@
 module sha512_compression(
     input clk,
     input reset,
+    output done,
 
     input [63:0] wi,
     input [63:0] ki,
@@ -23,9 +24,7 @@ module sha512_compression(
     output reg [63:0] oe,
     output reg [63:0] of,
     output reg [63:0] og,
-    output reg [63:0] oh,
-
-    output done
+    output reg [63:0] oh
     );
 
     reg [3:0] state;
