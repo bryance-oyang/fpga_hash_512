@@ -199,15 +199,6 @@ module sha512_chunk_2(
                 w[j][63:0] <= chunk0[64*(15-j) +: 64];
             end
 
-            ai <= H_const[0];
-            bi <= H_const[1];
-            ci <= H_const[2];
-            di <= H_const[3];
-            ei <= H_const[4];
-            fi <= H_const[5];
-            gi <= H_const[6];
-            hi <= H_const[7];
-
             oH0 <= H_const[0];
             oH1 <= H_const[1];
             oH2 <= H_const[2];
@@ -216,6 +207,15 @@ module sha512_chunk_2(
             oH5 <= H_const[5];
             oH6 <= H_const[6];
             oH7 <= H_const[7];
+
+            ai <= H_const[0];
+            bi <= H_const[1];
+            ci <= H_const[2];
+            di <= H_const[3];
+            ei <= H_const[4];
+            fi <= H_const[5];
+            gi <= H_const[6];
+            hi <= H_const[7];
 
             i <= 0;
             ichunk <= 0;
