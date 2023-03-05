@@ -30,14 +30,14 @@
 		w[i] = w[i-16] + s0 + w[i-7] + s1;
 	}
 
-	uint64_t ai = H0i;
-	uint64_t bi = H1i;
-	uint64_t ci = H2i;
-	uint64_t di = H3i;
-	uint64_t ei = H4i;
-	uint64_t fi = H5i;
-	uint64_t gi = H6i;
-	uint64_t hi = H7i;
+	uint64_t ai = iH[0];
+	uint64_t a[1] = iH[1];
+	uint64_t a[2] = iH[2];
+	uint64_t a[3] = iH[3];
+	uint64_t a[4] = iH[4];
+	uint64_t a[5] = iH[5];
+	uint64_t a[6] = iH[6];
+	uint64_t a[7] = iH[7];
 
     // RUN_COMPRESS
 	uint64_t oa, ob, oc, od, oe, of, og, oh;
@@ -47,13 +47,13 @@
 			K_const[i],
 
 			ai,
-			bi,
-			ci,
-			di,
-			ei,
-			fi,
-			gi,
-			hi,
+			a[1],
+			a[2],
+			a[3],
+			a[4],
+			a[5],
+			a[6],
+			a[7],
 
 			&oa,
 			&ob,
@@ -67,24 +67,24 @@
 
         // OUT_COMPRESS
 		ai = oa;
-		bi = ob;
-		ci = oc;
-		di = od;
-		ei = oe;
-		fi = of;
-		gi = og;
-		hi = oh;
+		a[1] = ob;
+		a[2] = oc;
+		a[3] = od;
+		a[4] = oe;
+		a[5] = of;
+		a[6] = og;
+		a[7] = oh;
 	}
 
 	// can be combinational, just need a done flag for loops
-	*oH0 = H0i + ai;
-	*oH1 = H1i + bi;
-	*oH2 = H2i + ci;
-	*oH3 = H3i + di;
-	*oH4 = H4i + ei;
-	*oH5 = H5i + fi;
-	*oH6 = H6i + gi;
-	*oH7 = H7i + hi;
+	*oH[0] = iH[0] + ai;
+	*oH[1] = iH[1] + a[1];
+	*oH[2] = iH[2] + a[2];
+	*oH[3] = iH[3] + a[3];
+	*oH[4] = iH[4] + a[4];
+	*oH[5] = iH[5] + a[5];
+	*oH[6] = iH[6] + a[6];
+	*oH[7] = iH[7] + a[7];
 */
 
 module sha512_chunk(
@@ -93,24 +93,8 @@ module sha512_chunk(
     output done,
 
     input [1023:0] chunk, // 128 bytes
-
-    input [63:0] H0i,
-    input [63:0] H1i,
-    input [63:0] H2i,
-    input [63:0] H3i,
-    input [63:0] H4i,
-    input [63:0] H5i,
-    input [63:0] H6i,
-    input [63:0] H7i,
-
-    output [63:0] oH0,
-    output [63:0] oH1,
-    output [63:0] oH2,
-    output [63:0] oH3,
-    output [63:0] oH4,
-    output [63:0] oH5,
-    output [63:0] oH6,
-    output [63:0] oH7
+    input [0:7][63:0] iH,
+    output [0:7][63:0] oH
 );
     localparam [63:0] K_const[0:79] = {
         64'h428a2f98d728ae22,
@@ -195,28 +179,20 @@ module sha512_chunk(
         64'h6c44198c4a475817
     };
 
-    reg [63:0] ai;
-    reg [63:0] bi;
-    reg [63:0] ci;
-    reg [63:0] di;
-    reg [63:0] ei;
-    reg [63:0] fi;
-    reg [63:0] gi;
-    reg [63:0] hi;
+    reg [0:16][63:0] w; // 16th is for scratch space to hold next w calculation
+    reg [0:7][63:0] a;
     reg [63:0] tmp1;
     reg [63:0] tmp2;
 
-    reg [0:16][63:0] w; // 16th is for scratch space to hold next w calculation
-
     // generate output
-    assign oH0 = H0i + ai;
-    assign oH1 = H1i + bi;
-    assign oH2 = H2i + ci;
-    assign oH3 = H3i + di;
-    assign oH4 = H4i + ei;
-    assign oH5 = H5i + fi;
-    assign oH6 = H6i + gi;
-    assign oH7 = H7i + hi;
+    assign oH[0] = iH[0] + a[0];
+    assign oH[1] = iH[1] + a[1];
+    assign oH[2] = iH[2] + a[2];
+    assign oH[3] = iH[3] + a[3];
+    assign oH[4] = iH[4] + a[4];
+    assign oH[5] = iH[5] + a[5];
+    assign oH[6] = iH[6] + a[6];
+    assign oH[7] = iH[7] + a[7];
 
     reg [2:0] state;
     reg [2:0] next;
@@ -264,29 +240,21 @@ module sha512_chunk(
                 w[j][63:0] <= chunk[64*(15-j) +: 64];
             end
 
-            ai <= H0i;
-            bi <= H1i;
-            ci <= H2i;
-            di <= H3i;
-            ei <= H4i;
-            fi <= H5i;
-            gi <= H6i;
-            hi <= H7i;
-
+            a <= iH;
             i <= 0;
         end
 
         TMPW: begin
-            tmp1 <= hi + K_const[i] + w[0]
-                + (((ei >> 14) | (ei << (64-14)))
-                  ^((ei >> 18) | (ei << (64-18)))
-                  ^((ei >> 41) | (ei << (64-41))))
-                + ((ei & fi) ^ ((~ei) & gi));
+            tmp1 <= a[7] + K_const[i] + w[0]
+                + (((a[4] >> 14) | (a[4] << (64-14)))
+                  ^((a[4] >> 18) | (a[4] << (64-18)))
+                  ^((a[4] >> 41) | (a[4] << (64-41))))
+                + ((a[4] & a[5]) ^ ((~a[4]) & a[6]));
 
-            tmp2 <= (((ai >> 28) | (ai << (64-28)))
-                    ^((ai >> 34) | (ai << (64-34)))
-                    ^((ai >> 39) | (ai << (64-39))))
-                + ((ai & bi) ^ (ai & ci) ^ (bi & ci));
+            tmp2 <= (((a[0] >> 28) | (a[0] << (64-28)))
+                    ^((a[0] >> 34) | (a[0] << (64-34)))
+                    ^((a[0] >> 39) | (a[0] << (64-39))))
+                + ((a[0] & a[1]) ^ (a[0] & a[2]) ^ (a[1] & a[2]));
 
             w[16] <= w[0] + w[9]
                 // s0
@@ -297,17 +265,13 @@ module sha512_chunk(
                 + (((w[14] >> 19) | (w[14] << (64-19)))
                 ^ ((w[14] >> 61) | (w[14] << (64-61)))
                 ^ ((w[14] >> 6)));
+
+            a <= (a >> 64);
         end
 
         COMPRESS: begin
-            hi <= gi;
-            gi <= fi;
-            fi <= ei;
-            ei <= di + tmp1;
-            di <= ci;
-            ci <= bi;
-            bi <= ai;
-            ai <= tmp1 + tmp2;
+            a[0] <= tmp1 + tmp2;
+            a[4] <= a[4] + tmp1;
 
             w <= (w << 64);
             i <= i + 1;

@@ -7,24 +7,8 @@ module test_chunk();
     reg done;
 
     reg [1023:0] chunk; // 128 bytes
-
-    reg [63:0] H0i;
-    reg [63:0] H1i;
-    reg [63:0] H2i;
-    reg [63:0] H3i;
-    reg [63:0] H4i;
-    reg [63:0] H5i;
-    reg [63:0] H6i;
-    reg [63:0] H7i;
-
-    wire [63:0] oH0;
-    wire [63:0] oH1;
-    wire [63:0] oH2;
-    wire [63:0] oH3;
-    wire [63:0] oH4;
-    wire [63:0] oH5;
-    wire [63:0] oH6;
-    wire [63:0] oH7;
+    reg [0:7][63:0] iH;
+    wire [0:7][63:0] oH;
 
     reg [3:0] state;
     reg [3:0] next;
@@ -76,15 +60,7 @@ module test_chunk();
         INIT: begin
             chunk[1024-64 +: 64] <= 64'd1;
 
-            H0i <= 0;
-            H1i <= 0;
-            H2i <= 0;
-            H3i <= 0;
-            H4i <= 0;
-            H5i <= 0;
-            H6i <= 0;
-            H7i <= 0;
-
+            iH <= 0;
             reset <= 0;
         end
 
@@ -99,24 +75,8 @@ module test_chunk();
         done,
 
         chunk, // 128 bytes
-
-        H0i,
-        H1i,
-        H2i,
-        H3i,
-        H4i,
-        H5i,
-        H6i,
-        H7i,
-
-        oH0,
-        oH1,
-        oH2,
-        oH3,
-        oH4,
-        oH5,
-        oH6,
-        oH7
+        iH,
+        oH
     );
 
 endmodule
