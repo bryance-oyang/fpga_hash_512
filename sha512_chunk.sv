@@ -195,8 +195,6 @@ module sha512_chunk(
         64'h6c44198c4a475817
     };
 
-    integer j;
-
     reg [63:0] ai;
     reg [63:0] bi;
     reg [63:0] ci;
@@ -212,23 +210,7 @@ module sha512_chunk(
     reg [63:0] tmp1;
     reg [63:0] tmp2;
 
-    // generate w's
     reg [63:0] w[0:79];
-    reg [63:0] feed_w[0:15];
-    reg [63:0] out_w[0:15];
-    always @(*) begin
-        for (j = 16; j < 32; j++) begin
-            out_w[j-16] = feed_w[j-16] + feed_w[j-7]
-                // s0
-                + ((feed_w[j-15] >> 1) | (feed_w[j-15] << (64-1)))
-                ^ ((feed_w[j-15] >> 8) | (feed_w[j-15] << (64-8)))
-                ^ ((feed_w[j-15] >> 7))
-                // s1
-                + ((feed_w[j-2] >> 19) | (feed_w[j-2] << (64-19)))
-                ^ ((feed_w[j-2] >> 61) | (feed_w[j-2] << (64-61)))
-                ^ ((feed_w[j-2] >> 6));
-        end
-    end
 
     // generate output
     assign oH0 = H0i + ai;
@@ -243,17 +225,15 @@ module sha512_chunk(
     reg [3:0] state;
     reg [3:0] next;
     reg [6:0] i;
+    reg [6:0] k;
 
     localparam BIRTH =        0;
-    localparam W_00 =         1;
-    localparam W_16 =         2;
-    localparam W_32 =         3;
-    localparam W_48 =         4;
-    localparam W_64 =         5;
-    localparam SCHMAJ =       6;
-    localparam TMPS =         7;
-    localparam OUT_COMPRESS = 8;
-    localparam DEATH =        9;
+    localparam INIT_W =       1;
+    localparam GEN_W =        2;
+    localparam SCHMAJ =       3;
+    localparam TMPS =         4;
+    localparam OUT_COMPRESS = 5;
+    localparam DEATH =        6;
 
     always @(posedge clk or negedge reset) begin
         if (!reset)
@@ -271,17 +251,15 @@ module sha512_chunk(
             next = DEATH;
 
         BIRTH:
-            next = W_00;
-        W_00:
-            next = W_16;
-        W_16:
-            next = W_32;
-        W_32:
-            next = W_48;
-        W_48:
-            next = W_64;
-        W_64:
-            next = SCHMAJ;
+            next = INIT_W;
+
+        INIT_W:
+            next = GEN_W;
+        GEN_W:
+            if (k < 80)
+                next = GEN_W;
+            else
+                next = SCHMAJ;
 
         SCHMAJ:
             next = TMPS;
@@ -297,31 +275,27 @@ module sha512_chunk(
 
     always @(posedge clk) begin
         case(next)
-        W_00: begin
-            for (j = 0; j < 16; j++) begin
+        INIT_W: begin
+            for (integer j = 0; j < 16; j++) begin
                 w[j][63:0] <= chunk[64*(15-j) +: 64];
-                feed_w[j][63:0] <= chunk[64*(15-j) +: 64];
             end
+
+            k <= 16;
         end
 
-        W_16: begin
-            w[16:31] <= out_w[0:15];
-            feed_w[0:15] <= out_w[0:15];
-        end
-
-        W_32: begin
-            w[32:47] <= out_w[0:15];
-            feed_w[0:15] <= out_w[0:15];
-        end
-
-        W_48: begin
-            w[48:63] <= out_w[0:15];
-            feed_w[0:15] <= out_w[0:15];
-        end
-
-        W_64: begin
-            w[64:79] <= out_w[0:15];
-            feed_w[0:15] <= out_w[0:15];
+        GEN_W: begin
+            for (integer j = 0; j < 2; j++) begin
+                w[k+j] <= w[k+j-16] + w[k+j-7]
+                    // s0
+                    + ((w[k+j-15] >> 1) | (w[k+j-15] << (64-1)))
+                    ^ ((w[k+j-15] >> 8) | (w[k+j-15] << (64-8)))
+                    ^ ((w[k+j-15] >> 7))
+                    // s1
+                    + ((w[k+j-2] >> 19) | (w[k+j-2] << (64-19)))
+                    ^ ((w[k+j-2] >> 61) | (w[k+j-2] << (64-61)))
+                    ^ ((w[k+j-2] >> 6));
+            end
+            k <= k + 1;
 
             ai <= H0i;
             bi <= H1i;
