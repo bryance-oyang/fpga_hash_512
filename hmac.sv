@@ -81,18 +81,23 @@ module hmac(
     localparam BIRTH =   0;
 
     localparam IPAD_0 =  1;
-    localparam IPAD_R =  2;
+    localparam IPAD_1 =  2;
+    localparam IPAD_R =  3;
 
-    localparam MSG_0 =   3;
-    localparam MSG_R =   4;
+    localparam MSG_0 =   4;
+    localparam MSG_1 =   5;
+    localparam MSG_R =   6;
 
-    localparam OPAD_0 =  5;
-    localparam OPAD_R =  6;
+    localparam OPAD_0 =  7;
+    localparam OPAD_1 =  8;
+    localparam OPAD_R =  9;
 
-    localparam SUM_0 =   7;
-    localparam SUM_R =   8;
+    localparam SUM_0 =  10;
+    localparam SUM_1 =  11;
+    localparam SUM_R =  12;
 
-    localparam DEATH =   9;
+    localparam HOLD =   13;
+    localparam DEATH =  14;
 
     always @(posedge clk or negedge reset) begin
         if (!reset)
@@ -113,6 +118,8 @@ module hmac(
             next = IPAD_0;
 
         IPAD_0:
+            next = IPAD_1;
+        IPAD_1:
             next = IPAD_R;
         IPAD_R:
             if (!sha512_done)
@@ -121,6 +128,8 @@ module hmac(
                 next = MSG_0;
 
         MSG_0:
+            next = MSG_1;
+        MSG_1:
             next = MSG_R;
         MSG_R:
             if (!sha512_done)
@@ -129,6 +138,8 @@ module hmac(
                 next = OPAD_0;
 
         OPAD_0:
+            next = OPAD_1;
+        OPAD_1:
             next = OPAD_R;
         OPAD_R:
             if (!sha512_done)
@@ -137,12 +148,17 @@ module hmac(
                 next = SUM_0;
 
         SUM_0:
+            next = SUM_1;
+        SUM_1:
             next = SUM_R;
         SUM_R:
             if (!sha512_done)
                 next = SUM_R;
             else
-                next = DEATH;
+                next = HOLD;
+
+        HOLD:
+            next = DEATH;
         endcase
     end
 
