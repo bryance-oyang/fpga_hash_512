@@ -68,7 +68,7 @@ module hmac(
     wire sha512_done;
     reg [1023:0] chunk;
     reg [0:7][63:0] iH;
-    reg [0:7][63:0] oH;
+    wire [0:7][63:0] oH;
     sha512_chunk sha512_chunk_0(
         clk,
         sha512_reset,
