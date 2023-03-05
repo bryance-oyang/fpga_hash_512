@@ -210,7 +210,7 @@ module sha512_chunk(
     reg [63:0] tmp1;
     reg [63:0] tmp2;
 
-    reg [63:0] w[0:79];
+    reg [0:16][63:0] w;
 
     // generate output
     assign oH0 = H0i + ai;
@@ -225,15 +225,13 @@ module sha512_chunk(
     reg [3:0] state;
     reg [3:0] next;
     reg [6:0] i;
-    reg [6:0] k;
 
     localparam BIRTH =        0;
-    localparam INIT_W =       1;
-    localparam GEN_W =        2;
-    localparam SCHMAJ =       3;
-    localparam TMPS =         4;
-    localparam OUT_COMPRESS = 5;
-    localparam DEATH =        6;
+    localparam INIT =         1;
+    localparam SCHMAJW =       2;
+    localparam TMPS =         3;
+    localparam OUT_COMPRESS = 4;
+    localparam DEATH =        5;
 
     always @(posedge clk or negedge reset) begin
         if (!reset)
@@ -251,23 +249,16 @@ module sha512_chunk(
             next = DEATH;
 
         BIRTH:
-            next = INIT_W;
-
-        INIT_W:
-            next = GEN_W;
-        GEN_W:
-            if (k < 80)
-                next = GEN_W;
-            else
-                next = SCHMAJ;
-
-        SCHMAJ:
+            next = INIT;
+        INIT:
+            next = SCHMAJW;
+        SCHMAJW:
             next = TMPS;
         TMPS:
             next = OUT_COMPRESS;
         OUT_COMPRESS:
             if (i < 80)
-                next = SCHMAJ;
+                next = SCHMAJW;
             else
                 next = DEATH;
         endcase
@@ -275,27 +266,10 @@ module sha512_chunk(
 
     always @(posedge clk) begin
         case(next)
-        INIT_W: begin
+        INIT: begin
             for (integer j = 0; j < 16; j++) begin
                 w[j][63:0] <= chunk[64*(15-j) +: 64];
             end
-
-            k <= 16;
-        end
-
-        GEN_W: begin
-            for (integer j = 0; j < 2; j++) begin
-                w[k+j] <= w[k+j-16] + w[k+j-7]
-                    // s0
-                    + (((w[k+j-15] >> 1) | (w[k+j-15] << (64-1)))
-                    ^ ((w[k+j-15] >> 8) | (w[k+j-15] << (64-8)))
-                    ^ ((w[k+j-15] >> 7)))
-                    // s1
-                    + (((w[k+j-2] >> 19) | (w[k+j-2] << (64-19)))
-                    ^ ((w[k+j-2] >> 61) | (w[k+j-2] << (64-61)))
-                    ^ ((w[k+j-2] >> 6)));
-            end
-            k <= k + 2;
 
             ai <= H0i;
             bi <= H1i;
@@ -309,7 +283,17 @@ module sha512_chunk(
             i <= 0;
         end
 
-        SCHMAJ: begin
+        SCHMAJW: begin
+            w[16] <= w[0] + w[9]
+                // s0
+                + (((w[1] >> 1) | (w[1] << (64-1)))
+                ^ ((w[1] >> 8) | (w[1] << (64-8)))
+                ^ ((w[1] >> 7)))
+                // s1
+                + (((w[14] >> 19) | (w[14] << (64-19)))
+                ^ ((w[14] >> 61) | (w[14] << (64-61)))
+                ^ ((w[14] >> 6)));
+
             S0 <= ((ai >> 28) | (ai << (64-28)))
                 ^((ai >> 34) | (ai << (64-34)))
                 ^((ai >> 39) | (ai << (64-39)));
@@ -321,11 +305,13 @@ module sha512_chunk(
         end
 
         TMPS: begin
-            tmp1 <= hi + S1 + ch + K_const[i] + w[i];
+            tmp1 <= hi + S1 + ch + K_const[i] + w[0];
             tmp2 <= S0 + maj;
         end
 
         OUT_COMPRESS: begin
+            w <= (w << 64);
+
             hi <= gi;
             gi <= fi;
             fi <= ei;
