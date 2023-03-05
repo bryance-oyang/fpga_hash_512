@@ -24,7 +24,7 @@ iH = oH;
 sha512(chunk);
 
 // OPAD_0
-shasum = oH;
+out = oH; // use out buffer to store tmp sha_sum_1
 chunk = opad ^ key;
 iH = init;
 
@@ -32,7 +32,7 @@ iH = init;
 sha512(chunk);
 
 // SUM_0
-chunk = shasum and pad;
+chunk = out and pad;
 iH = oH;
 
 // SUM_R
@@ -154,8 +154,6 @@ module hmac(
         endcase
     end
 
-    reg [511:0] shasum;
-
     always @(posedge clk) begin
         case(next)
         IPAD_0: begin
@@ -207,7 +205,7 @@ module hmac(
             sha512_reset <= 0;
             iH <= H_const;
 
-            shasum <= oH;
+            out <= oH; // use out buffer to store tmp sha_sum_1
             // o_pad
             for (integer i = 0; i < 128; i++) begin
                 chunk[`CIDX(i,1024) +: 8] <= 8'h5c ^ key[`CIDX(i,1024) +: 8];
@@ -221,7 +219,7 @@ module hmac(
             sha512_reset <= 0;
             iH <= oH;
 
-            chunk[1023:512] <= shasum[511:0];
+            chunk[1023:512] <= out[511:0];
 
             // sha512 padding: 1 and msg len in bits
             chunk[`CIDX(64,1024) +: 8] <= 8'h80;
