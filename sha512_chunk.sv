@@ -194,6 +194,8 @@ module sha512_chunk(
         64'h5fcb6fab3ad6faec,
         64'h6c44198c4a475817
     };
+    
+    integer j;
 
     reg [63:0] ai;
     reg [63:0] bi;
@@ -215,17 +217,17 @@ module sha512_chunk(
     reg [63:0] feed_w[0:15];
     reg [63:0] out_w[0:15];
     always @(*) begin
-        for (i = 16; i < 32; i++) {
-            out_w[i-16] = feed_w[i-16] + feed_w[i-7]
+        for (j = 16; j < 32; j++) begin
+            out_w[j-16] = feed_w[j-16] + feed_w[j-7]
                 // s0
-                + ((feed_w[i-15] >> 1) | (feed_w[i-15] << (64-1)))
-                ^ ((feed_w[i-15] >> 8) | (feed_w[i-15] << (64-8)))
-                ^ ((feed_w[i-15] >> 7))
+                + ((feed_w[j-15] >> 1) | (feed_w[j-15] << (64-1)))
+                ^ ((feed_w[j-15] >> 8) | (feed_w[j-15] << (64-8)))
+                ^ ((feed_w[j-15] >> 7))
                 // s1
-                + ((feed_w[i-2] >> 19) | (feed_w[i-2] << (64-19)))
-                ^ ((feed_w[i-2] >> 61) | (feed_w[i-2] << (64-61)))
-                ^ ((feed_w[i-2] >> 6));
-        }
+                + ((feed_w[j-2] >> 19) | (feed_w[j-2] << (64-19)))
+                ^ ((feed_w[j-2] >> 61) | (feed_w[j-2] << (64-61)))
+                ^ ((feed_w[j-2] >> 6));
+        end
     end
 
     // generate output
@@ -242,7 +244,6 @@ module sha512_chunk(
     reg [3:0] next;
     reg [6:0] i;
 
-    integer j;
     localparam BIRTH =        0;
     localparam W_00 =         1;
     localparam W_16 =         2;
@@ -267,7 +268,7 @@ module sha512_chunk(
         default:
             next = BIRTH;
         DEATH:
-            next = DEATH
+            next = DEATH;
 
         BIRTH:
             next = W_00;
@@ -297,10 +298,10 @@ module sha512_chunk(
     always @(posedge clk) begin
         case(next)
         W_00: begin
-            for (j = 0; j < 16; j++) {
-                w[j][63:0] <= chunk[64*(16-j) - 1 : 64*(15-j)];
-                feed_w[j][63:0] <= chunk[64*(16-j) - 1 : 64*(15-j)];
-            }
+            for (j = 0; j < 16; j++) begin
+                w[j][63:0] <= chunk[64*(15-j) +: 64];
+                feed_w[j][63:0] <= chunk[64*(15-j) +: 64];
+            end
         end
 
         W_16: begin
@@ -346,7 +347,7 @@ module sha512_chunk(
         end
 
         TMPS: begin
-            tmp1 <= hi + S1 + ch + K[i] + w[i];
+            tmp1 <= hi + S1 + ch + K_const[i] + w[i];
             tmp2 <= S0 + maj;
         end
 
