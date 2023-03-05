@@ -98,9 +98,8 @@ module sha512_chunk(
         64'h6c44198c4a475817
     };
 
-    reg [0:16][63:0] w; // 16th is for scratch space to hold next w calculation
+    reg [0:15][63:0] w;
     reg [0:7][63:0] a; // a,b,c,d,e,f,g,h
-    reg [63:0] tmp1;
 
     // generate output
     assign oH[0] = iH[0] + a[0];
@@ -112,15 +111,14 @@ module sha512_chunk(
     assign oH[6] = iH[6] + a[6];
     assign oH[7] = iH[7] + a[7];
 
-    reg [2:0] state;
-    reg [2:0] next;
+    reg [1:0] state;
+    reg [1:0] next;
     reg [6:0] i;
 
     localparam BIRTH =    0;
     localparam INIT =     1;
-    localparam TMPW =     2;
-    localparam COMPRESS = 3;
-    localparam DEATH =    4;
+    localparam COMPRESS = 2;
+    localparam DEATH =    3;
 
     always @(posedge clk or negedge reset) begin
         if (!reset)
@@ -140,12 +138,10 @@ module sha512_chunk(
         BIRTH:
             next = INIT;
         INIT:
-            next = TMPW;
-        TMPW:
             next = COMPRESS;
         COMPRESS:
             if (i < 80)
-                next = TMPW;
+                next = COMPRESS;
             else
                 next = DEATH;
         endcase
@@ -162,14 +158,8 @@ module sha512_chunk(
             i <= 0;
         end
 
-        TMPW: begin
-            tmp1 <= a[7] + K_const[i] + w[0]
-                + (((a[4] >> 14) | (a[4] << (64-14)))
-                  ^((a[4] >> 18) | (a[4] << (64-18)))
-                  ^((a[4] >> 41) | (a[4] << (64-41))))
-                + ((a[4] & a[5]) ^ ((~a[4]) & a[6]));
-
-            w[16] <= w[0] + w[9]
+        COMPRESS: begin
+            w[15] <= w[0] + w[9]
                 // s0
                 + (((w[1] >> 1) | (w[1] << (64-1)))
                 ^ ((w[1] >> 8) | (w[1] << (64-8)))
@@ -178,19 +168,26 @@ module sha512_chunk(
                 + (((w[14] >> 19) | (w[14] << (64-19)))
                 ^ ((w[14] >> 61) | (w[14] << (64-61)))
                 ^ ((w[14] >> 6)));
-            
+
             a[0] <= (((a[0] >> 28) | (a[0] << (64-28)))
                     ^((a[0] >> 34) | (a[0] << (64-34)))
                     ^((a[0] >> 39) | (a[0] << (64-39))))
-                + ((a[0] & a[1]) ^ (a[0] & a[2]) ^ (a[1] & a[2])); // a = tmp2 (+ tmp1 later)
-            a[1:7] <= a[0:6]; // b = a, c = b, etc
-        end
+                + ((a[0] & a[1]) ^ (a[0] & a[2]) ^ (a[1] & a[2]))
+                + a[7] + K_const[i] + w[0]
+                + (((a[4] >> 14) | (a[4] << (64-14)))
+                  ^((a[4] >> 18) | (a[4] << (64-18)))
+                  ^((a[4] >> 41) | (a[4] << (64-41))))
+                + ((a[4] & a[5]) ^ ((~a[4]) & a[6]));
+            a[1:3] <= a[0:2];
+            a[4] <= a[3]
+                + a[7] + K_const[i] + w[0]
+                + (((a[4] >> 14) | (a[4] << (64-14)))
+                  ^((a[4] >> 18) | (a[4] << (64-18)))
+                  ^((a[4] >> 41) | (a[4] << (64-41))))
+                + ((a[4] & a[5]) ^ ((~a[4]) & a[6]));
+            a[5:7] <= a[4:6];
 
-        COMPRESS: begin
-            a[0] <= a[0] + tmp1;
-            a[4] <= a[4] + tmp1;
-
-            w <= (w << 64); // make next input w the w[0]
+            w[0:14] <= w[1:15]; // make next input w the w[0]
             i <= i + 1;
         end
         endcase
