@@ -37,6 +37,9 @@ iH = oH;
 
 // SUM_R
 sha512(chunk);
+
+// OUT
+out = oH
 */
 
 module hmac(
@@ -47,7 +50,7 @@ module hmac(
     input mode, // mode == 0 means 36B/288b msg; mode == 1 means 64B/512b msg (32 byte salt + 4 byte int in PBKDF2 or prior hash)
     input [1023:0] key, // NEEDS to be zero padded
     input [511:0] msg, // does NOT need to be zero padded
-    output [511:0] oH
+    output reg [511:0] out
 );
     localparam [0:7][63:0] H_const = {
         64'h6a09e667f3bcc908,
@@ -65,6 +68,7 @@ module hmac(
     wire sha512_done;
     reg [1023:0] chunk;
     reg [0:7][63:0] iH;
+    reg [0:7][63:0] oH;
     sha512_chunk sha512_chunk_0(
         clk,
         sha512_reset,
@@ -92,7 +96,8 @@ module hmac(
     localparam SUM_0 =   7;
     localparam SUM_R =   8;
 
-    localparam DEATH =   9;
+    localparam OUT =     9;
+    localparam DEATH =   10;
 
     always @(posedge clk or negedge reset) begin
         if (!reset)
@@ -142,7 +147,10 @@ module hmac(
             if (!sha512_done)
                 next = SUM_R;
             else
-                next = DEATH;
+                next = OUT;
+
+        OUT:
+            next = DEATH;
         endcase
     end
 
@@ -226,6 +234,9 @@ module hmac(
 
         SUM_R:
             sha512_reset <= 1;
+
+        OUT:
+            out <= oH;
         endcase
     end
 
