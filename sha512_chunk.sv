@@ -15,7 +15,8 @@ module sha512_chunk(
     input [0:7][63:0] iH, // 64 bytes == 512 bits input hash
     output [0:7][63:0] oH // 64 bytes == 512 bits output hash
 );
-    localparam [63:0] K_const[0:79] = {
+    // extra K constant for hkw precomputation
+    localparam [0:80][63:0] K_const = {
         64'h428a2f98d728ae22,
         64'h7137449123ef65cd,
         64'hb5c0fbcfec4d3b2f,
@@ -95,11 +96,13 @@ module sha512_chunk(
         64'h4cc5d4becb3e42b6,
         64'h597f299cfc657e2a,
         64'h5fcb6fab3ad6faec,
-        64'h6c44198c4a475817
+        64'h6c44198c4a475817,
+        64'h0
     };
 
     reg [0:15][63:0] w;
     reg [0:7][63:0] a; // a,b,c,d,e,f,g,h
+    reg [63:0] hkw; // precomputes h + K + w for next round
 
     // generate output
     assign oH[0] = iH[0] + a[0];
@@ -154,11 +157,14 @@ module sha512_chunk(
                 w[j][63:0] <= chunk[64*(15-j) +: 64];
             end
 
+            hkw <= iH[7] + K_const[0] + chunk[64*(15) +: 64];
+
             a <= iH;
             i <= 0;
         end
 
         COMPRESS: begin
+            w[0:14] <= w[1:15];
             w[15] <= w[0] + w[9]
                 // s0
                 + (((w[1] >> 1) | (w[1] << (64-1)))
@@ -173,11 +179,11 @@ module sha512_chunk(
                     ^((a[0] >> 34) | (a[0] << (64-34)))
                     ^((a[0] >> 39) | (a[0] << (64-39))))
                 + ((a[0] & a[1]) ^ (a[0] & a[2]) ^ (a[1] & a[2]))
-                + a[7] + K_const[i] + w[0]
                 + (((a[4] >> 14) | (a[4] << (64-14)))
                   ^((a[4] >> 18) | (a[4] << (64-18)))
                   ^((a[4] >> 41) | (a[4] << (64-41))))
-                + ((a[4] & a[5]) ^ ((~a[4]) & a[6]));
+                + ((a[4] & a[5]) ^ ((~a[4]) & a[6]))
+                + hkw;
             a[1:3] <= a[0:2];
             a[4] <= a[3]
                 + a[7] + K_const[i] + w[0]
@@ -187,7 +193,7 @@ module sha512_chunk(
                 + ((a[4] & a[5]) ^ ((~a[4]) & a[6]));
             a[5:7] <= a[4:6];
 
-            w[0:14] <= w[1:15]; // make next input w the w[0]
+            hkw <= a[6] + K_const[i+1] + w[1];
             i <= i + 1;
         end
         endcase
