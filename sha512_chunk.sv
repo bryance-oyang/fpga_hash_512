@@ -115,8 +115,10 @@ module sha512_chunk(
     localparam COMPRESS = 2;
     localparam DEATH =    3;
 
-    always @(posedge clk or negedge reset) begin
-        if (!reset)
+    reg breset;
+    better_reset better_reset_0(clk, reset, breset);
+    always @(posedge clk or negedge breset) begin
+        if (!breset)
             state <= BIRTH;
         else
             state <= next;
