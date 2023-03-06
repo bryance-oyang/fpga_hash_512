@@ -1,4 +1,4 @@
-# fpga_hash
+# fpga_hash_512
 Hardware FPGA implementation of PBKDF2-HMAC-SHA512 for restricted key sizes (<= 128 Bytes)
 and salts (== 32 Bytes).
 
