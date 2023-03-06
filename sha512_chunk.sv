@@ -103,16 +103,8 @@ module sha512_chunk(
     reg [0:15][63:0] w;
     reg [0:7][63:0] a; // a,b,c,d,e,f,g,h
     reg [63:0] hkw; // precomputes h + K + w for next round
-
-    // generate output
-    assign oH[0] = iH[0] + a[0];
-    assign oH[1] = iH[1] + a[1];
-    assign oH[2] = iH[2] + a[2];
-    assign oH[3] = iH[3] + a[3];
-    assign oH[4] = iH[4] + a[4];
-    assign oH[5] = iH[5] + a[5];
-    assign oH[6] = iH[6] + a[6];
-    assign oH[7] = iH[7] + a[7];
+    wire [63:0] chS1;
+    wire [63:0] maS0;
 
     reg [1:0] state;
     reg [1:0] next;
@@ -153,11 +145,12 @@ module sha512_chunk(
     always @(posedge clk) begin
         case(next)
         INIT: begin
+            // load first 16 (1024 bits == 128 Bytes)
             for (integer j = 0; j < 16; j++) begin
                 w[j][63:0] <= chunk[64*(15-j) +: 64];
             end
 
-            hkw <= iH[7] + K_const[0] + chunk[64*(15) +: 64];
+            hkw <= iH[7] + K_const[0] + chunk[64*(15) +: 64]; // precompute simple parts for next round
 
             a <= iH;
             i <= 0;
@@ -175,27 +168,34 @@ module sha512_chunk(
                 ^ ((w[14] >> 61) | (w[14] << (64-61)))
                 ^ ((w[14] >> 6)));
 
-            a[0] <= (((a[0] >> 28) | (a[0] << (64-28)))
-                    ^((a[0] >> 34) | (a[0] << (64-34)))
-                    ^((a[0] >> 39) | (a[0] << (64-39))))
-                + ((a[0] & a[1]) ^ (a[0] & a[2]) ^ (a[1] & a[2]))
-                + (((a[4] >> 14) | (a[4] << (64-14)))
-                  ^((a[4] >> 18) | (a[4] << (64-18)))
-                  ^((a[4] >> 41) | (a[4] << (64-41))))
-                + ((a[4] & a[5]) ^ ((~a[4]) & a[6]))
-                + hkw;
+            a[0] <= hkw + chS1 + maS0;
             a[1:3] <= a[0:2];
-            a[4] <= a[3]
-                + a[7] + K_const[i] + w[0]
-                + (((a[4] >> 14) | (a[4] << (64-14)))
-                  ^((a[4] >> 18) | (a[4] << (64-18)))
-                  ^((a[4] >> 41) | (a[4] << (64-41))))
-                + ((a[4] & a[5]) ^ ((~a[4]) & a[6]));
+            a[4] <= a[3] + hkw + chS1;
             a[5:7] <= a[4:6];
 
-            hkw <= a[6] + K_const[i+1] + w[1];
+            hkw <= a[6] + K_const[i+1] + w[1]; // precompute simple parts for next round
             i <= i + 1;
         end
         endcase
     end
+
+    assign chS1 = (((a[4] >> 14) | (a[4] << (64-14)))
+                  ^((a[4] >> 18) | (a[4] << (64-18)))
+                  ^((a[4] >> 41) | (a[4] << (64-41))))
+                  +((a[4] & a[5]) ^ ((~a[4]) & a[6]));
+
+    assign maS0 = (((a[0] >> 28) | (a[0] << (64-28)))
+                  ^((a[0] >> 34) | (a[0] << (64-34)))
+                  ^((a[0] >> 39) | (a[0] << (64-39))))
+                  +((a[0] & a[1]) ^ (a[0] & a[2]) ^ (a[1] & a[2]));
+
+    // generate output
+    assign oH[0] = iH[0] + a[0];
+    assign oH[1] = iH[1] + a[1];
+    assign oH[2] = iH[2] + a[2];
+    assign oH[3] = iH[3] + a[3];
+    assign oH[4] = iH[4] + a[4];
+    assign oH[5] = iH[5] + a[5];
+    assign oH[6] = iH[6] + a[6];
+    assign oH[7] = iH[7] + a[7];
 endmodule
