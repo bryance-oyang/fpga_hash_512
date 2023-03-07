@@ -14,7 +14,7 @@ module test_pbkdf2();
     localparam RUN = 2;
     localparam DEATH = 3;
 
-    reg [0:127][8:0] key;
+    reg [0:127][7:0] key;
     initial begin
         clk = 0;
         clk_count = -1;
@@ -59,8 +59,6 @@ module test_pbkdf2();
         case(next)
         INIT: begin
             reset <= 0;
-            key <= 0;
-            /*
             key[0] <= 8'd116;
             key[1] <= 8'd101;
             key[2] <= 8'd97;
@@ -68,7 +66,6 @@ module test_pbkdf2();
             key[4] <= 8'd104;
             key[5] <= 8'd101;
             key[6] <= 8'd114;
-            */
         end
 
         RUN:
@@ -76,7 +73,7 @@ module test_pbkdf2();
         endcase
     end
 
-    pbkdf2 #(.salt(0)) pbkdf2_0 (
+    pbkdf2 pbkdf2_0 (
         clk,
         reset,
         done,

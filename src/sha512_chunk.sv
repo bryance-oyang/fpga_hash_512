@@ -1,9 +1,10 @@
 `timescale 1ns / 1ps
 
 /*
-The w generation and compression rounds are combined into the same loop.
-w[0] is always the input to the compression, and newly generated w's are
-shifted left during the looping.
+The w generation and compression round are done in the same clock cycle.
+
+w[0] is always the input to the compression, and w's are shifted left in each
+round so only the latest 16 w's are stored at a time.
 */
 
 module sha512_chunk(
@@ -11,11 +12,11 @@ module sha512_chunk(
     input reset,
     output done,
 
-    input [1023:0] chunk, // 128 bytes
-    input [0:7][63:0] iH, // 64 bytes == 512 bits input hash
-    output [0:7][63:0] oH // 64 bytes == 512 bits output hash
+    input [1023:0] chunk, // 128 Bytes
+    input [0:7][63:0] iH, // 64 Bytes == 512 bits input hash
+    output [0:7][63:0] oH // 64 Bytes == 512 bits output hash
 );
-    // extra K constant for hkw precomputation
+    // 80th is an extra K constant for hkw precomputation to prevent overflow read
     localparam [0:80][63:0] K_const = {
         64'h428a2f98d728ae22,
         64'h7137449123ef65cd,
@@ -101,6 +102,7 @@ module sha512_chunk(
     };
 
     reg [0:15][63:0] w;
+    reg [63:0] new_w;
     reg [0:7][63:0] a; // a,b,c,d,e,f,g,h
     reg [63:0] hkw; // precomputes h + K + w for next round
     wire [63:0] chS1;
@@ -152,34 +154,40 @@ module sha512_chunk(
                 w[j][63:0] <= chunk[64*(15-j) +: 64];
             end
 
-            hkw <= iH[7] + K_const[0] + chunk[64*(15) +: 64]; // precompute simple parts for next round
-
             a <= iH;
+
+            // precompute simple parts for next round (b/c addition is slow)
+            hkw <= iH[7] + K_const[0] + chunk[64*(15) +: 64];
+
             i <= 0;
         end
 
         COMPRESS: begin
-            w[0:14] <= w[1:15];
-            w[15] <= w[0] + w[9]
-                // s0
-                + (((w[1] >> 1) | (w[1] << (64-1)))
-                ^ ((w[1] >> 8) | (w[1] << (64-8)))
-                ^ ((w[1] >> 7)))
-                // s1
-                + (((w[14] >> 19) | (w[14] << (64-19)))
-                ^ ((w[14] >> 61) | (w[14] << (64-61)))
-                ^ ((w[14] >> 6)));
-
             a[0] <= hkw + chS1 + maS0;
             a[1:3] <= a[0:2];
             a[4] <= a[3] + hkw + chS1;
             a[5:7] <= a[4:6];
 
-            hkw <= a[6] + K_const[i+1] + w[1]; // precompute simple parts for next round
+            w[0:14] <= w[1:15];
+            w[15] <= new_w;
+
+            // precompute simple parts for next round (b/c addition is slow)
+            hkw <= a[6] + K_const[i+1] + w[1];
+
             i <= i + 1;
         end
         endcase
     end
+
+    assign new_w = w[0] + w[9]
+        // s0
+        + (((w[1] >> 1) | (w[1] << (64-1)))
+        ^ ((w[1] >> 8) | (w[1] << (64-8)))
+        ^ ((w[1] >> 7)))
+        // s1
+        + (((w[14] >> 19) | (w[14] << (64-19)))
+        ^ ((w[14] >> 61) | (w[14] << (64-61)))
+        ^ ((w[14] >> 6)));
 
     assign chS1 = (((a[4] >> 14) | (a[4] << (64-14)))
                   ^((a[4] >> 18) | (a[4] << (64-18)))

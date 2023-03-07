@@ -9,7 +9,7 @@
 }
 
 { // HMAC_36
-    hmac_36(key, msg, &result);
+    hmac_36(key, msg, &result); // first round uses salt + 4 Byte int (1)
 }
 
 { // DATA
@@ -20,7 +20,7 @@
 } // if (i < iterations) goto HMAC_64; else goto DEATH;
 
 { // HMAC_64
-    hmac_64(key, msg, &result);
+    hmac_64(key, msg, &result); // remaining rounds use previous hash
 } // goto DATA;
 */
 
