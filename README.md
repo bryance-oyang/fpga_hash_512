@@ -13,3 +13,4 @@ resulting hash and `salt`. `iterations` indicates the number of PBKDF2 HMAC cycl
 ## References
 1. [US Secure Hash Algorithms (SHA and HMAC-SHA)](https://www.rfc-editor.org/rfc/rfc6234)
 2. [Password-Based Cryptography Specification](https://www.rfc-editor.org/rfc/rfc8018)
+3. [Use Synchronized Asynchronous Reset](https://www.intel.com/content/www/us/en/docs/programmable/683082/22-3/use-synchronized-asynchronous-reset.html)
