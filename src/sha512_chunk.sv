@@ -102,24 +102,11 @@ module sha512_chunk(
     };
 
     reg [0:15][63:0] w;
-    reg [63:0] s0;
-    reg [63:0] s1;
     reg [63:0] new_w;
-
     reg [0:7][63:0] a; // a,b,c,d,e,f,g,h
-    wire [63:0] new_a0;
-    wire [63:0] new_a4;
-
-    // precomputes h + K + w for next round
-    wire [63:0] hkw;
-    reg [63:0] hkw_h;
-    reg [63:0] hkw_k;
-    reg [63:0] hkw_w;
-
-    wire [63:0] ch;
-    wire [63:0] ma;
-    wire [63:0] S0;
-    wire [63:0] S1;
+    reg [63:0] hkw; // precomputes h + K + w for next round
+    wire [63:0] chS1;
+    wire [63:0] maS0;
 
     reg [1:0] state;
     reg [1:0] next;
@@ -169,53 +156,48 @@ module sha512_chunk(
 
             a <= iH;
 
-            hkw_h <= iH[7];
-            hkw_k <= K_const[0];
-            hkw_w <= chunk[64*(15) +: 64];
+            // precompute simple parts for next round (b/c addition is slow)
+            hkw <= iH[7] + K_const[0] + chunk[64*(15) +: 64];
 
             i <= 0;
         end
 
         COMPRESS: begin
-            a[0] <= new_a0;
+            a[0] <= hkw + chS1 + maS0;
             a[1:3] <= a[0:2];
-            a[4] <= new_a4;
+            a[4] <= a[3] + hkw + chS1;
             a[5:7] <= a[4:6];
 
             w[0:14] <= w[1:15];
             w[15] <= new_w;
 
-            hkw_h <= a[6];
-            hkw_k <= K_const[i+1];
-            hkw_w <= w[1];
+            // precompute simple parts for next round (b/c addition is slow)
+            hkw <= a[6] + K_const[i+1] + w[1];
 
             i <= i + 1;
         end
         endcase
     end
 
-    carry_save_adder#(3) csa_hkw({hkw_h, hkw_k, hkw_w}, hkw);
+    assign new_w = w[0] + w[9]
+        // s0
+        + (((w[1] >> 1) | (w[1] << (64-1)))
+        ^ ((w[1] >> 8) | (w[1] << (64-8)))
+        ^ ((w[1] >> 7)))
+        // s1
+        + (((w[14] >> 19) | (w[14] << (64-19)))
+        ^ ((w[14] >> 61) | (w[14] << (64-61)))
+        ^ ((w[14] >> 6)));
 
-    assign s0 =  ((w[1] >> 1) | (w[1] << (64-1)))
-                ^((w[1] >> 8) | (w[1] << (64-8)))
-                ^((w[1] >> 7));
-    assign s1 =  ((w[14] >> 19) | (w[14] << (64-19)))
-                ^((w[14] >> 61) | (w[14] << (64-61)))
-                ^((w[14] >> 6));
+    assign chS1 = (((a[4] >> 14) | (a[4] << (64-14)))
+                  ^((a[4] >> 18) | (a[4] << (64-18)))
+                  ^((a[4] >> 41) | (a[4] << (64-41))))
+                  +((a[4] & a[5]) ^ ((~a[4]) & a[6]));
 
-    carry_save_adder#(4) csa_w({s0, s1, w[0], w[9]}, new_w);
-
-    assign ch = (a[4] & a[5]) ^ ((~a[4]) & a[6]);
-    assign ma = (a[0] & a[1]) ^ (a[0] & a[2]) ^ (a[1] & a[2]);
-    assign S0 =  ((a[0] >> 28) | (a[0] << (64-28)))
-                ^((a[0] >> 34) | (a[0] << (64-34)))
-                ^((a[0] >> 39) | (a[0] << (64-39)));
-    assign S1 =  ((a[4] >> 14) | (a[4] << (64-14)))
-                ^((a[4] >> 18) | (a[4] << (64-18)))
-                ^((a[4] >> 41) | (a[4] << (64-41)));
-
-    carry_save_adder#(4) csa_a4({a[3], ch, S1, hkw}, new_a4);
-    carry_save_adder#(5) csa_a0({ch, S1, hkw, ma, S0}, new_a0);
+    assign maS0 = (((a[0] >> 28) | (a[0] << (64-28)))
+                  ^((a[0] >> 34) | (a[0] << (64-34)))
+                  ^((a[0] >> 39) | (a[0] << (64-39))))
+                  +((a[0] & a[1]) ^ (a[0] & a[2]) ^ (a[1] & a[2]));
 
     // generate output
     assign oH[0] = iH[0] + a[0];

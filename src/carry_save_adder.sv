@@ -1,5 +1,6 @@
 `timescale 1ns / 1ps
 
+/* More efficiently adds n numbers with only 1 ripple carry */
 module carry_save_adder#(
     parameter n // n >= 3
 )(
